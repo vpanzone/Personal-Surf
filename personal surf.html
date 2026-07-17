@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Personal Surf">
+  <title>Personal Surf 🏄</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, 'Inter', system-ui, sans-serif; background: #F7F8FA; -webkit-tap-highlight-color: transparent; }
+    ::-webkit-scrollbar { width: 0; height: 0; }
+    @keyframes bounce { 0%,100%{transform:translateY(0);opacity:0.4} 50%{transform:translateY(-4px);opacity:1} }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+// ─── STORAGE (localStorage para app standalone) ───────────────────
+const storage = {
+  get: (k) => { try { const v = localStorage.getItem(k); return v ? { value: v } : null; } catch { return null; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
+  delete: (k) => { try { localStorage.removeItem(k); } catch {} },
+};
+
+// ─── DADOS DOS TREINOS ────────────────────────────────────────────
+const TREINOS = [
+  {
+    id: 1, nome: "Força Superior + Core", duracao: "~55 min", minutos: 55,
+    cor: "#1A3A5C", corLight: "#D6EAF8",
+    foco: "Ombros, costas, core anti-rotação — padrão de remada",
+    blocos: [
+      { titulo: "Aquecimento (10 min)", descanso: 0, exercicios: [
+        { nome: "Rotação torácica no rolo", numSeries: 2, reps: "10 / lado", obs: "Devagar, respira na rotação" },
+        { nome: "Dislocação com elástico (shoulder pass)", numSeries: 2, reps: "15", obs: "Mobilidade de ombro antes de remar" },
+      ]},
+      { titulo: "Bloco Principal", descanso: 60, exercicios: [
+        { nome: "Remada curvada com pronação", numSeries: 4, reps: "15", obs: "Simula o padrão da remada. Tempo sob tensão" },
+        { nome: "Pulldown pegada neutra (supinada)", numSeries: 3, reps: "15", obs: "Latíssimo — tração na remada" },
+        { nome: "Desenvolvimento de ombros com halteres", numSeries: 3, reps: "15", obs: "Sentado, controle no excêntrico" },
+        { nome: "Elevação lateral + frontal alternado", numSeries: 3, reps: "12 / lado", obs: "Manguito rotador — prevenção de lesão" },
+        { nome: "Flexão diamante (mãos próximas)", numSeries: 3, reps: "máximo", obs: "Tríceps + peito, padrão do pop-up" },
+      ]},
+      { titulo: "Core — Obrigatório (15 min)", descanso: 30, exercicios: [
+        { nome: "Prancha com elevação de braço alternado", numSeries: 3, reps: "30 seg", obs: "Core anti-rotação. Quadril parado" },
+        { nome: "Dead bug", numSeries: 3, reps: "10 / lado", obs: "Controle lombar. Costas no chão" },
+        { nome: "Pallof press com elástico", numSeries: 3, reps: "12 / lado", obs: "Estabilidade lateral — equilíbrio na onda" },
+      ]},
+    ],
+  },
+  {
+    id: 2, nome: "Resistência Muscular", duracao: "~50 min", minutos: 50,
+    cor: "#085041", corLight: "#D5F5E3",
+    foco: "Circuitos de alta repetição — combate à fadiga precoce no surf",
+    blocos: [
+      { titulo: "Circuito A — 4 rounds (descanso 45 seg)", descanso: 45, exercicios: [
+        { nome: "Burpee com salto", numSeries: 4, reps: "15", obs: "Padrão próximo ao pop-up + explosão" },
+        { nome: "Remada no TRX ou elástico", numSeries: 4, reps: "20", obs: "Resistência de remada em fadiga" },
+        { nome: "Agachamento com salto", numSeries: 4, reps: "15", obs: "Explosão de membros inferiores" },
+        { nome: "Mountain climber", numSeries: 4, reps: "30 seg", obs: "Core + cardio integrado" },
+      ]},
+      { titulo: "Circuito B — 3 rounds (descanso 60 seg)", descanso: 60, exercicios: [
+        { nome: "Swing com kettlebell", numSeries: 3, reps: "20", obs: "Potência de quadril + resistência cardiovascular" },
+        { nome: "Flexão com rotação de tronco", numSeries: 3, reps: "10 / lado", obs: "Força funcional + mobilidade" },
+        { nome: "Afundo caminhando com halteres", numSeries: 3, reps: "12 / lado", obs: "Unilateral — trabalha desequilíbrios" },
+      ]},
+      { titulo: "Mobilidade Final — obrigatório (10 min)", descanso: 0, exercicios: [
+        { nome: "Pigeon pose", numSeries: 1, reps: "90 seg / lado", obs: "Abre quadril — fundamental para postura no surf" },
+        { nome: "Alongamento de quadriceps em pé", numSeries: 1, reps: "60 seg / lado", obs: "Prevenção de cãimbras" },
+      ]},
+    ],
+  },
+  {
+    id: 3, nome: "Força Inferior + Explosão", duracao: "~55 min", minutos: 55,
+    cor: "#784212", corLight: "#F5CBA7",
+    foco: "Pernas, glúteo, panturrilha, explosão no pop-up — protocolo anti-cãimbras",
+    blocos: [
+      { titulo: "Aquecimento Específico (10 min)", descanso: 0, exercicios: [
+        { nome: "Foam roller em quadriceps e panturrilha", numSeries: 1, reps: "2 min cada", obs: "Devagar, para nos pontos de tensão" },
+        { nome: "Mobilidade de tornozelo na parede", numSeries: 2, reps: "15", obs: "Principal prevenção de cãimbra" },
+      ]},
+      { titulo: "Bloco Principal", descanso: 60, exercicios: [
+        { nome: "Agachamento goblet (haltere no peito)", numSeries: 4, reps: "15", obs: "Amplitude completa, postura ereta" },
+        { nome: "Leg press (carga moderada)", numSeries: 3, reps: "20", obs: "Endurance muscular. Pés altos no apoio" },
+        { nome: "Afundo búlgaro com halteres", numSeries: 3, reps: "12 / lado", obs: "Melhor para estabilidade de quadril no surf" },
+        { nome: "Levantamento terra romeno (halteres)", numSeries: 3, reps: "15", obs: "Posterior + glúteo — equilíbrio muscular do quad" },
+        { nome: "Elevação de panturrilha unilateral", numSeries: 3, reps: "20 / lado", obs: "Fortalece panturrilha — reduz cãimbras" },
+      ]},
+      { titulo: "Explosão (5 min)", descanso: 120, exercicios: [
+        { nome: "Box jump ou salto vertical", numSeries: 4, reps: "5", obs: "Potência do pop-up. Descanso total entre sets" },
+      ]},
+      { titulo: "⚠ Alongamento Obrigatório (10 min)", descanso: 0, exercicios: [
+        { nome: "Couch stretch (quadriceps na parede)", numSeries: 1, reps: "2 min / lado", obs: "O mais importante. Joelho na parede, avança o quadril" },
+        { nome: "Panturrilha com faixa (dorsiflexão passiva)", numSeries: 1, reps: "90 seg / lado", obs: "Alivia tensão que gera cãimbra" },
+      ]},
+    ],
+  },
+  {
+    id: 4, nome: "Full Body Funcional", duracao: "~50 min", minutos: 50,
+    cor: "#2C3E50", corLight: "#F2F3F4",
+    foco: "Padrões de movimento do surf — rotação, empurrão, puxada, equilíbrio",
+    blocos: [
+      { titulo: "Padrões de Movimento do Surf", descanso: 60, exercicios: [
+        { nome: "Turkish get-up (haltere leve)", numSeries: 3, reps: "5 / lado", obs: "Simula o pop-up. Core + estabilidade de ombro" },
+        { nome: "Remada com rotação (cabo ou elástico)", numSeries: 3, reps: "15 / lado", obs: "Remada com rotação de tronco" },
+        { nome: "Chop e lift (cabo diagonal)", numSeries: 3, reps: "12 / lado", obs: "Rotação de tronco com carga — padrão de manobra" },
+        { nome: "Agachamento unilateral (pistol assistido)", numSeries: 3, reps: "8 / lado", obs: "Equilíbrio e força unilateral" },
+        { nome: "Equilíbrio em bosu", numSeries: 3, reps: "45 seg", obs: "Propriocepção — treino direto para a prancha" },
+      ]},
+      { titulo: "Condicionamento Final", descanso: 10, exercicios: [
+        { nome: "Tabata: flexão + agachamento alternado", numSeries: 8, reps: "20 seg", obs: "20 seg trabalho / 10 seg descanso" },
+      ]},
+    ],
+  },
+];
+
+const FASES = [
+  { nome: "Adaptação", semanas: "1–6", cor: "#1D6FA4", desc: "Corpo aprendendo os padrões. Treinos vão parecer pesados mesmo com carga moderada." },
+  { nome: "Desenvolvimento", semanas: "7–12", cor: "#0F6E56", desc: "Fadiga no surf começa a ceder, cãimbras diminuem, treinos ficam mais controláveis." },
+  { nome: "Plateau → Revisão", semanas: "13+", cor: "#784212", desc: "Treinos ficam fáceis com frequência. Hora de revisar: aumentar intensidade ou mudar estímulos." },
+];
+
+function formatDate(iso) {
+  return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
+}
+function getProximoTreino(h) {
+  if (!h.length) return TREINOS[0];
+  const idx = TREINOS.findIndex(t => t.id === h[h.length-1].treinoId);
+  return TREINOS[(idx + 1) % TREINOS.length];
+}
+function getFase(n) { return n <= 18 ? FASES[0] : n <= 36 ? FASES[1] : FASES[2]; }
+function semanasSince(h) {
+  if (!h.length) return 0;
+  return Math.floor((new Date() - new Date(h[0].data)) / (7*24*60*60*1000));
+}
+function totalMin(h) { return h.reduce((a,x) => a + (TREINOS.find(t=>t.id===x.treinoId)?.minutos||52), 0); }
+function buildSeries(treino) {
+  const s = {};
+  treino.blocos.forEach((b,bi) => b.exercicios.forEach((e,ei) => { s[`${bi}-${ei}`] = { expanded: false, done: Array(e.numSeries).fill(false) }; }));
+  return s;
+}
+
+function RestTimer({ seconds, cor, onDone }) {
+  const [rem, setRem] = useState(seconds);
+  useEffect(() => {
+    const t = setInterval(() => setRem(r => { if (r<=1){clearInterval(t);onDone();return 0;} return r-1; }), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const pct = ((seconds - rem) / seconds) * 100;
+  const m = Math.floor(rem/60), s = rem%60;
+  return (
+    <div style={{background:"#EBF5FB",borderRadius:16,padding:"20px",margin:"12px 0",textAlign:"center",border:`1px solid ${cor}33`}}>
+      <div style={{fontSize:12,color:"#888",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600}}>Descansando</div>
+      <div style={{fontSize:48,fontWeight:700,color:cor,letterSpacing:"-2px"}}>{m>0?`${m}:${String(s).padStart(2,"0")}`:s+"s"}</div>
+      <div style={{background:"#D0E8F5",borderRadius:4,height:4,margin:"14px 0 16px",overflow:"hidden"}}>
+        <div style={{height:"100%",background:cor,borderRadius:4,width:`${pct}%`,transition:"width 1s linear"}}/>
+      </div>
+      <button onClick={onDone} style={{background:"#fff",border:"1px solid #ddd",color:"#888",borderRadius:10,padding:"8px 20px",fontSize:13,cursor:"pointer"}}>Pular descanso</button>
+    </div>
+  );
+}
+
+function ExRow({ ex, bloco, exKey, ss, onToggle, cor }) {
+  const st = ss[exKey] || { expanded:false, done:Array(ex.numSeries).fill(false) };
+  const done = st.done.filter(Boolean).length;
+  const all = done === ex.numSeries;
+  return (
+    <div style={{borderBottom:"1px solid #F0F0F0"}}>
+      <div onClick={() => onToggle(exKey,"expand")} style={{display:"flex",alignItems:"center",padding:"14px 16px",cursor:"pointer",gap:12}}>
+        <div style={{position:"relative",width:36,height:36,flexShrink:0}}>
+          <svg width="36" height="36" style={{transform:"rotate(-90deg)"}}>
+            <circle cx="18" cy="18" r="15" fill="none" stroke="#E8E8E8" strokeWidth="3"/>
+            <circle cx="18" cy="18" r="15" fill="none" stroke={all?cor:cor+"88"} strokeWidth="3"
+              strokeDasharray={`${2*Math.PI*15}`} strokeDashoffset={`${2*Math.PI*15*(1-done/ex.numSeries)}`}
+              strokeLinecap="round" style={{transition:"stroke-dashoffset 0.3s"}}/>
+          </svg>
+          <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:all?cor:"#aaa"}}>
+            {all?"✓":`${done}/${ex.numSeries}`}
+          </div>
+        </div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontWeight:600,fontSize:14,color:all?"#aaa":"#1C2B3A",textDecoration:all?"line-through":"none"}}>{ex.nome}</div>
+          <div style={{fontSize:12,color:"#999",marginTop:2}}>{ex.numSeries} × {ex.reps}</div>
+        </div>
+        <div style={{color:"#ccc",fontSize:16,transform:st.expanded?"rotate(180deg)":"none",transition:"transform 0.2s"}}>▾</div>
+      </div>
+      {st.expanded && (
+        <div style={{background:"#FAFAFA",padding:"0 16px 14px"}}>
+          {ex.obs && <div style={{fontSize:12,color:"#888",fontStyle:"italic",marginBottom:12,padding:"8px 12px",background:"#F0F0F0",borderRadius:8}}>{ex.obs}</div>}
+          <div style={{display:"grid",gridTemplateColumns:"40px 1fr 1fr 48px",gap:8,padding:"6px 0",marginBottom:4}}>
+            {["SÉRIE","REPS","CARGA",""].map((h,i)=><div key={i} style={{fontSize:11,color:"#bbb",fontWeight:600,textAlign:i>0?"center":"left"}}>{h}</div>)}
+          </div>
+          {st.done.map((d,si) => (
+            <div key={si} style={{display:"grid",gridTemplateColumns:"40px 1fr 1fr 48px",gap:8,alignItems:"center",padding:"10px 0",borderTop:si>0?"1px solid #EBEBEB":"none",opacity:d?0.4:1,transition:"opacity 0.2s"}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#999"}}>{si+1}</div>
+              <div style={{textAlign:"center"}}><div style={{background:"#EFEFEF",borderRadius:8,padding:"7px 10px",fontSize:13,color:"#555"}}>{ex.reps}</div></div>
+              <div style={{textAlign:"center"}}><div style={{background:"#EFEFEF",borderRadius:8,padding:"7px 10px",fontSize:13,color:"#aaa"}}>—</div></div>
+              <button onClick={()=>onToggle(exKey,"serie",si)} style={{width:36,height:36,borderRadius:8,background:d?cor:"#fff",border:`1.5px solid ${d?cor:"#DDD"}`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,color:d?"#fff":"#ccc",transition:"all 0.15s"}}>
+                {d?"✓":""}
+              </button>
+            </div>
+          ))}
+          {bloco.descanso>0 && <div style={{fontSize:11,color:"#bbb",marginTop:8}}>⏱ Descanso: {bloco.descanso>=60?`${Math.floor(bloco.descanso/60)}min`:`${bloco.descanso}s`}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const DIF = {
+  "Fácil":{bg:"#D5F5E3",fg:"#085041",border:"#1D9E75"},
+  "Ok":{bg:"#EBF5FB",fg:"#1A3A5C",border:"#2E86C1"},
+  "Pesado":{bg:"#FADBD8",fg:"#922B21",border:"#C0392B"},
+};
+
+function App() {
+  const [aba, setAba] = useState("hoje");
+  const [historico, setHistorico] = useState(() => { const v = storage.get("surf_h"); return v ? JSON.parse(v.value) : []; });
+  const [treinoAtivo, setTreinoAtivo] = useState(null);
+  const [ss, setSs] = useState({});
+  const [timer, setTimer] = useState(null);
+  const [modal, setModal] = useState(null);
+  const [chatMsgs, setChatMsgs] = useState(() => { const v = storage.get("surf_c"); return v ? JSON.parse(v.value) : [{ role:"assistant", text:"Oi! Sou seu Personal de surf. Analiso seus treinos, periodizo e ajusto conforme seu feedback. O que você quer hoje?" }]; });
+  const [chatIn, setChatIn] = useState("");
+  const [chatLoad, setChatLoad] = useState(false);
+  const chatRef = useRef(null);
+
+  useEffect(() => { storage.set("surf_h", JSON.stringify(historico)); }, [historico]);
+  useEffect(() => { storage.set("surf_c", JSON.stringify(chatMsgs)); }, [chatMsgs]);
+  useEffect(() => { chatRef.current?.scrollIntoView({behavior:"smooth"}); }, [chatMsgs]);
+
+  const prox = getProximoTreino(historico);
+  const fase = getFase(historico.length);
+  const sem = semanasSince(historico);
+  const mins = totalMin(historico);
+
+  function iniciar(t) { setTreinoAtivo(t); setSs(buildSeries(t)); setTimer(null); setAba("exec"); }
+  function toggleSeries(key, tipo, idx) {
+    if (tipo==="expand") { setSs(s=>({...s,[key]:{...s[key],expanded:!s[key].expanded}})); return; }
+    setSs(s => {
+      const st = s[key], nd = [...st.done];
+      nd[idx] = !nd[idx];
+      if (nd[idx]) {
+        const [bi] = key.split("-").map(Number);
+        const b = treinoAtivo.blocos[bi];
+        if (b.descanso>0) setTimer({seconds:b.descanso,cor:treinoAtivo.cor,key});
+      } else setTimer(null);
+      return {...s,[key]:{...st,done:nd}};
+    });
+  }
+  function calcProg() {
+    if (!treinoAtivo) return {d:0,t:0};
+    let d=0,t=0;
+    treinoAtivo.blocos.forEach((b,bi)=>b.exercicios.forEach((e,ei)=>{const k=`${bi}-${ei}`,st=ss[k];if(st){d+=st.done.filter(Boolean).length;t+=e.numSeries;}}));
+    return {d,t};
+  }
+  const prog = calcProg();
+  const pct = prog.t>0?(prog.d/prog.t)*100:0;
+
+  function salvar() {
+    if (!modal?.dif) return;
+    setHistorico(h=>[...h,{id:Date.now(),treinoId:modal.treino.id,treinoNome:modal.treino.nome,data:new Date().toISOString(),dificuldade:modal.dif,obs:modal.obs}]);
+    setModal(null); setTreinoAtivo(null); setAba("hoje");
+  }
+
+  async function enviar() {
+    const msg = chatIn.trim(); if (!msg||chatLoad) return;
+    setChatIn("");
+    const hist = [...chatMsgs,{role:"user",text:msg}];
+    setChatMsgs(hist); setChatLoad(true);
+    const rec = historico.slice(-12).map(h=>`- ${formatDate(h.data)}: T${h.treinoId} ${h.treinoNome} — ${h.dificuldade}${h.obs?` — "${h.obs}"`:"" }`).join("\n")||"Sem treinos ainda.";
+    const sys = `Você é um personal trainer especializado em surf. Atleta: 31 anos, 75kg, surfa 6x/semana, intermediário. 5 anos hipertrofia à falha. Problemas: fadiga precoce, cãimbras quad/panturrilha, mobilidade limitada. Ciclo: T1 Superior+Core T2 Resistência T3 Inferior+Explosão T4 Funcional. Fase atual: ${fase.nome} (${historico.length} treinos, ${sem} semanas, ${Math.round(mins/60)}h). Histórico:\n${rec}\nResponda em pt-BR, direto, máx 3 parágrafos.`;
+    try {
+      const r = await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,system:sys,messages:hist.map(m=>({role:m.role==="assistant"?"assistant":"user",content:m.text}))})});
+      const d = await r.json();
+      setChatMsgs(m=>[...m,{role:"assistant",text:d.content?.[0]?.text||"Erro."}]);
+    } catch { setChatMsgs(m=>[...m,{role:"assistant",text:"Erro de conexão."}]); }
+    setChatLoad(false);
+  }
+
+  const FeedbackModal = ({inExec}) => modal ? (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"flex-end",zIndex:100,backdropFilter:"blur(4px)"}}>
+      <div style={{background:"#fff",borderRadius:"20px 20px 0 0",padding:"24px 20px 40px",width:"100%",maxWidth:680,margin:"0 auto"}}>
+        <div style={{fontSize:17,fontWeight:700,marginBottom:4}}>Treino {modal.treino.id} concluído 🎉</div>
+        <div style={{fontSize:13,color:"#888",marginBottom:20}}>{modal.treino.nome}</div>
+        <div style={{fontSize:13,fontWeight:600,color:"#444",marginBottom:10}}>Como foi a dificuldade?</div>
+        <div style={{display:"flex",gap:10,marginBottom:20}}>
+          {["Fácil","Ok","Pesado"].map(d=>{const dc=DIF[d],sel=modal.dif===d;return(<button key={d} onClick={()=>setModal(m=>({...m,dif:d}))} style={{flex:1,padding:"12px 0",borderRadius:12,background:sel?dc.bg:"#F7F8FA",border:`2px solid ${sel?dc.border:"#E8E8E8"}`,color:sel?dc.fg:"#888",fontWeight:700,fontSize:14,cursor:"pointer"}}>{d}</button>);})}
+        </div>
+        <div style={{fontSize:13,fontWeight:600,color:"#444",marginBottom:8}}>Observações (opcional)</div>
+        <textarea value={modal.obs} onChange={e=>setModal(m=>({...m,obs:e.target.value}))} placeholder="Ex: cãimbra no quadriceps, muito cansado..." style={{width:"100%",border:"1px solid #E0E0E0",borderRadius:12,padding:"12px 14px",fontSize:14,resize:"none",height:80,outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
+        <div style={{display:"flex",gap:10,marginTop:16}}>
+          <button onClick={()=>setModal(null)} style={{flex:1,background:"#F0F0F0",border:"none",borderRadius:12,padding:"14px",fontSize:14,fontWeight:600,cursor:"pointer",color:"#666"}}>Cancelar</button>
+          <button onClick={salvar} disabled={!modal.dif} style={{flex:2,background:modal.dif?`linear-gradient(135deg,${modal.treino.cor},${modal.treino.cor}BB)`:"#ccc",border:"none",borderRadius:12,padding:"14px",fontSize:14,fontWeight:700,cursor:modal.dif?"pointer":"default",color:"#fff"}}>Salvar treino</button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  // MODO EXECUÇÃO
+  if (aba==="exec" && treinoAtivo) return (
+    <div style={{fontFamily:"-apple-system,sans-serif",background:"#F7F8FA",minHeight:"100vh",color:"#1C2B3A",paddingTop:"env(safe-area-inset-top)"}}>
+      <div style={{background:"#fff",padding:"16px 20px",position:"sticky",top:0,zIndex:10,borderBottom:"1px solid #F0F0F0",boxShadow:"0 1px 8px rgba(0,0,0,0.06)"}}>
+        <div style={{maxWidth:680,margin:"0 auto"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+            <button onClick={()=>setAba("treinos")} style={{background:"none",border:"none",color:"#888",cursor:"pointer",fontSize:13}}>← Sair</button>
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#1C2B3A"}}>Treino {treinoAtivo.id}</div>
+              <div style={{fontSize:11,color:"#888"}}>{treinoAtivo.nome}</div>
+            </div>
+            <button onClick={()=>setModal({treino:treinoAtivo,dif:null,obs:""})} style={{background:treinoAtivo.cor,border:"none",color:"#fff",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>Concluir</button>
+          </div>
+          <div style={{background:"#EEE",borderRadius:3,height:3,overflow:"hidden"}}>
+            <div style={{height:"100%",background:treinoAtivo.cor,width:`${pct}%`,transition:"width 0.3s"}}/>
+          </div>
+          <div style={{fontSize:11,color:"#aaa",marginTop:5,textAlign:"right"}}>{prog.d}/{prog.t} séries</div>
+        </div>
+      </div>
+      <div style={{maxWidth:680,margin:"0 auto",padding:"16px 0 100px"}}>
+        {timer && <div style={{padding:"0 16px"}}><RestTimer key={timer.key} seconds={timer.seconds} cor={timer.cor} onDone={()=>setTimer(null)}/></div>}
+        {treinoAtivo.blocos.map((b,bi)=>(
+          <div key={bi} style={{marginBottom:8}}>
+            <div style={{padding:"12px 16px 8px",fontSize:11,fontWeight:700,color:"#aaa",textTransform:"uppercase",letterSpacing:"0.07em"}}>{b.titulo}</div>
+            <div style={{background:"#fff",borderRadius:14,overflow:"hidden",margin:"0 8px",boxShadow:"0 1px 6px rgba(0,0,0,0.05)"}}>
+              {b.exercicios.map((e,ei)=><ExRow key={ei} ex={e} bloco={b} exKey={`${bi}-${ei}`} ss={ss} onToggle={toggleSeries} cor={treinoAtivo.cor}/>)}
+            </div>
+          </div>
+        ))}
+        <div style={{padding:"16px",position:"fixed",bottom:0,left:0,right:0,background:"linear-gradient(transparent,#F7F8FA 40%)"}}>
+          <button onClick={()=>setModal({treino:treinoAtivo,dif:null,obs:""})} style={{width:"100%",background:`linear-gradient(135deg,${treinoAtivo.cor},${treinoAtivo.cor}CC)`,border:"none",color:"#fff",borderRadius:14,padding:"16px",fontSize:15,fontWeight:700,cursor:"pointer"}}>
+            ✓ Concluir treino {pct<100?`(${Math.round(pct)}%)`:"🎉"}
+          </button>
+        </div>
+      </div>
+      <FeedbackModal/>
+    </div>
+  );
+
+  // INTERFACE PRINCIPAL
+  return (
+    <div style={{fontFamily:"-apple-system,sans-serif",background:"#F7F8FA",minHeight:"100vh",color:"#1C2B3A",paddingTop:"env(safe-area-inset-top)"}}>
+      <div style={{background:"linear-gradient(135deg,#1A3A5C 0%,#0F6E56 100%)",padding:"18px 20px 0",position:"sticky",top:0,zIndex:10,boxShadow:"0 2px 12px rgba(0,0,0,0.15)"}}>
+        <div style={{maxWidth:680,margin:"0 auto"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+            <span style={{fontSize:20}}>🏄</span>
+            <div>
+              <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>Personal Surf</div>
+              <div style={{fontSize:11,color:"rgba(255,255,255,0.6)",marginTop:1}}>{historico.length} treinos · {Math.round(mins/60)}h · {fase.nome}</div>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:2,overflowX:"auto"}}>
+            {[["hoje","Hoje"],["treinos","Treinos"],["evolucao","Evolução"],["historico","Histórico"],["chat","Personal IA"]].map(([id,label])=>(
+              <button key={id} onClick={()=>setAba(id)} style={{background:aba===id?"rgba(255,255,255,0.15)":"transparent",border:"none",borderBottom:aba===id?"2px solid #fff":"2px solid transparent",color:aba===id?"#fff":"rgba(255,255,255,0.6)",padding:"8px 13px",fontSize:13,fontWeight:aba===id?600:400,cursor:"pointer",borderRadius:"6px 6px 0 0",whiteSpace:"nowrap",flexShrink:0}}>{label}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={{maxWidth:680,margin:"0 auto",padding:"20px 16px 80px"}}>
+
+        {aba==="hoje" && (
+          <div>
+            <div style={{background:fase.cor,borderRadius:14,padding:"12px 16px",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div><div style={{fontSize:11,color:"rgba(255,255,255,0.65)",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.07em"}}>Fase atual</div><div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{fase.nome}</div></div>
+              <div style={{textAlign:"right"}}><div style={{fontSize:22,fontWeight:700,color:"#fff"}}>{historico.length}</div><div style={{fontSize:11,color:"rgba(255,255,255,0.65)"}}>treinos</div></div>
+            </div>
+            <div style={{background:"#fff",borderRadius:16,overflow:"hidden",boxShadow:"0 2px 12px rgba(0,0,0,0.06)",marginBottom:14}}>
+              <div style={{background:`linear-gradient(135deg,${prox.cor},${prox.cor}CC)`,padding:"18px 20px"}}>
+                <div style={{fontSize:11,color:"rgba(255,255,255,0.65)",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>Próximo treino</div>
+                <div style={{fontSize:19,fontWeight:700,color:"#fff",marginBottom:4}}>Treino {prox.id} — {prox.nome}</div>
+                <div style={{fontSize:13,color:"rgba(255,255,255,0.8)"}}>{prox.foco}</div>
+                <div style={{marginTop:6,fontSize:12,color:"rgba(255,255,255,0.5)"}}>{prox.duracao}</div>
+              </div>
+              <div style={{padding:"14px 20px",display:"flex",gap:10}}>
+                <button onClick={()=>iniciar(prox)} style={{flex:1,background:prox.cor,color:"#fff",border:"none",borderRadius:10,padding:"13px",fontSize:14,fontWeight:700,cursor:"pointer"}}>▶ Iniciar treino</button>
+                <button onClick={()=>setModal({treino:prox,dif:null,obs:""})} style={{flex:1,background:prox.corLight,color:prox.cor,border:"none",borderRadius:10,padding:"13px",fontSize:14,fontWeight:600,cursor:"pointer"}}>✓ Já fiz</button>
+              </div>
+            </div>
+            {historico.length>0&&(()=>{const u=historico[historico.length-1],dc=DIF[u.dificuldade]||DIF["Ok"];return(<div style={{background:"#fff",borderRadius:14,padding:"14px 18px",boxShadow:"0 1px 6px rgba(0,0,0,0.05)",marginBottom:14}}><div style={{fontSize:11,color:"#aaa",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:8}}>Último treino</div><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}><div><div style={{fontWeight:600,fontSize:14}}>Treino {u.treinoId} — {u.treinoNome}</div><div style={{fontSize:12,color:"#999",marginTop:2}}>{formatDate(u.data)}</div>{u.obs&&<div style={{fontSize:12,color:"#666",marginTop:6,fontStyle:"italic"}}>"{u.obs}"</div>}</div><span style={{background:dc.bg,color:dc.fg,border:`1px solid ${dc.border}`,borderRadius:20,padding:"3px 10px",fontSize:12,fontWeight:600}}>{u.dificuldade}</span></div></div>);})()}
+            <div style={{background:"linear-gradient(135deg,#085041,#1D9E75)",borderRadius:14,padding:"16px 18px"}}>
+              <div style={{fontSize:11,color:"rgba(255,255,255,0.65)",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:8}}>Mobilidade — todo dia</div>
+              <div style={{color:"#fff",fontSize:13,lineHeight:1.7}}>
+                <div>🌅 <b>Pré-surf:</b> Rotação torácica · Hip circle · Tornozelo na parede · Shoulder pass · Pop-up simulado</div>
+                <div>🌊 <b>Pós-surf:</b> Couch stretch 2min/lado · Pombo · Panturrilha com faixa · Torção espinhal</div>
+                <div>🌙 <b>Noite:</b> 90/90 · Downward dog · Respiração diafragmática</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {aba==="treinos" && (
+          <div>
+            <div style={{fontSize:13,color:"#888",marginBottom:14}}>Toca em "Iniciar" para entrar no modo de execução</div>
+            {TREINOS.map(t=>(
+              <div key={t.id} style={{background:"#fff",borderRadius:16,padding:"16px 20px",marginBottom:12,boxShadow:"0 2px 8px rgba(0,0,0,0.05)",borderLeft:`4px solid ${t.cor}`,opacity:prox.id===t.id?1:0.72}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                  <div style={{flex:1}}><div style={{fontWeight:700,fontSize:15,color:t.cor}}>Treino {t.id}</div><div style={{fontWeight:600,fontSize:14,marginTop:2}}>{t.nome}</div><div style={{fontSize:12,color:"#777",marginTop:4,lineHeight:1.5}}>{t.foco}</div></div>
+                  <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:8,flexShrink:0,marginLeft:12}}>
+                    {prox.id===t.id&&<span style={{background:t.corLight,color:t.cor,fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:20}}>próximo</span>}
+                    <span style={{fontSize:11,color:"#aaa"}}>{t.duracao}</span>
+                  </div>
+                </div>
+                <button onClick={()=>iniciar(t)} style={{width:"100%",marginTop:14,background:t.cor,color:"#fff",border:"none",borderRadius:10,padding:"11px",fontSize:14,fontWeight:700,cursor:"pointer"}}>▶ Iniciar treino</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {aba==="evolucao" && (
+          <div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
+              {[[historico.length,"treinos"],[`${Math.round(mins/60)}h`,"de treino"],[sem,sem===1?"semana":"semanas"]].map(([v,l],i)=>(
+                <div key={i} style={{background:"#fff",borderRadius:14,padding:"14px 12px",textAlign:"center",boxShadow:"0 1px 6px rgba(0,0,0,0.05)"}}>
+                  <div style={{fontSize:20,fontWeight:700,color:"#1A3A5C"}}>{v}</div>
+                  <div style={{fontSize:11,color:"#888",marginTop:4}}>{l}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{background:"#fff",borderRadius:14,padding:"16px 18px",marginBottom:14,boxShadow:"0 1px 6px rgba(0,0,0,0.05)"}}>
+              <div style={{fontSize:13,fontWeight:600,marginBottom:14}}>Progresso no programa</div>
+              {FASES.map((f,i)=>{const ativ=fase.nome===f.nome,pass=FASES.indexOf(fase)>i;return(
+                <div key={i} style={{display:"flex",gap:12,marginBottom:i<FASES.length-1?16:0,alignItems:"flex-start"}}>
+                  <div style={{width:28,height:28,borderRadius:"50%",background:ativ?f.cor:pass?"#ccc":"#F0F0F0",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:2,fontSize:12,color:ativ||pass?"#fff":"#aaa"}}>{pass?"✓":ativ?"●":"○"}</div>
+                  <div style={{flex:1}}>
+                    <div style={{display:"flex",justifyContent:"space-between"}}><div style={{fontWeight:ativ?700:500,fontSize:14,color:ativ?f.cor:pass?"#aaa":"#555"}}>{f.nome}</div><div style={{fontSize:11,color:"#aaa"}}>sem. {f.semanas}</div></div>
+                    <div style={{fontSize:12,color:ativ?"#555":"#aaa",marginTop:3,lineHeight:1.5}}>{f.desc}</div>
+                    {ativ&&<div style={{marginTop:8,background:"#F0F0F0",borderRadius:8,height:5,overflow:"hidden"}}><div style={{height:"100%",background:f.cor,width:`${Math.min(100,(historico.length/36)*100)}%`,transition:"width 0.5s"}}/></div>}
+                  </div>
+                </div>
+              );})}
+            </div>
+            <div style={{background:"#fff",borderRadius:14,padding:"16px 18px",marginBottom:14,boxShadow:"0 1px 6px rgba(0,0,0,0.05)"}}>
+              <div style={{fontSize:13,fontWeight:600,marginBottom:12}}>Distribuição dos treinos</div>
+              {TREINOS.map(t=>{const c=historico.filter(h=>h.treinoId===t.id).length,p=historico.length>0?(c/historico.length)*100:0;return(
+                <div key={t.id} style={{marginBottom:10}}>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:4}}><span style={{color:t.cor,fontWeight:500}}>T{t.id} {t.nome}</span><span style={{color:"#888"}}>{c}×</span></div>
+                  <div style={{background:"#F0F0F0",borderRadius:4,height:6,overflow:"hidden"}}><div style={{height:"100%",background:t.cor,width:`${p}%`,transition:"width 0.5s"}}/></div>
+                </div>
+              );})}
+            </div>
+            {historico.length>=4&&(
+              <div style={{background:"#fff",borderRadius:14,padding:"16px 18px",boxShadow:"0 1px 6px rgba(0,0,0,0.05)"}}>
+                <div style={{fontSize:13,fontWeight:600,marginBottom:4}}>Últimos treinos — dificuldade</div>
+                <div style={{fontSize:12,color:"#888",marginBottom:12}}>Muitos verdes seguidos = hora de evoluir</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {historico.slice(-16).map((h,i)=>{const dc=DIF[h.dificuldade]||DIF["Ok"];return(<div key={i} style={{width:36,height:36,borderRadius:8,background:dc.bg,border:`1.5px solid ${dc.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:dc.fg}}>T{h.treinoId}</div>);})}
+                </div>
+              </div>
+            )}
+            {historico.length===0&&<div style={{textAlign:"center",padding:"40px 20px",color:"#aaa"}}><div style={{fontSize:36,marginBottom:10}}>📈</div><div>Conclua o primeiro treino para ver a evolução</div></div>}
+          </div>
+        )}
+
+        {aba==="historico" && (
+          <div>
+            {historico.length===0?<div style={{textAlign:"center",padding:"60px 20px",color:"#aaa"}}><div style={{fontSize:40,marginBottom:12}}>📋</div><div>Nenhum treino registrado</div></div>:(
+              <>
+                {[...historico].reverse().map(h=>{const t=TREINOS.find(t=>t.id===h.treinoId),dc=DIF[h.dificuldade]||DIF["Ok"];return(
+                  <div key={h.id} style={{background:"#fff",borderRadius:14,padding:"14px 18px",marginBottom:10,boxShadow:"0 1px 6px rgba(0,0,0,0.05)",borderLeft:`3px solid ${t?.cor||"#ccc"}`}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                      <div><div style={{fontWeight:600,fontSize:14}}>Treino {h.treinoId} — {h.treinoNome}</div><div style={{fontSize:12,color:"#999",marginTop:2}}>{formatDate(h.data)}</div>{h.obs&&<div style={{fontSize:12,color:"#666",marginTop:6,fontStyle:"italic"}}>"{h.obs}"</div>}</div>
+                      <span style={{background:dc.bg,color:dc.fg,border:`1px solid ${dc.border}`,borderRadius:20,padding:"3px 10px",fontSize:12,fontWeight:600,flexShrink:0}}>{h.dificuldade}</span>
+                    </div>
+                  </div>
+                );})}
+                <button onClick={()=>{if(window.confirm("Apagar todo o histórico?")){setHistorico([]);storage.delete("surf_h");}}} style={{width:"100%",background:"none",border:"1px solid #FADBD8",color:"#C0392B",borderRadius:10,padding:"10px",fontSize:13,cursor:"pointer",marginTop:8}}>Limpar histórico</button>
+              </>
+            )}
+          </div>
+        )}
+
+        {aba==="chat" && (
+          <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 180px)"}}>
+            <div style={{flex:1,overflowY:"auto",paddingBottom:16}}>
+              {chatMsgs.map((m,i)=>(
+                <div key={i} style={{display:"flex",justifyContent:m.role==="user"?"flex-end":"flex-start",marginBottom:12}}>
+                  {m.role==="assistant"&&<div style={{width:28,height:28,borderRadius:"50%",background:"linear-gradient(135deg,#1A3A5C,#0F6E56)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0,marginRight:8,marginTop:2}}>🏄</div>}
+                  <div style={{maxWidth:"78%",padding:"11px 14px",borderRadius:m.role==="user"?"18px 18px 4px 18px":"18px 18px 18px 4px",background:m.role==="user"?"#1A3A5C":"#fff",color:m.role==="user"?"#fff":"#1C2B3A",fontSize:14,lineHeight:1.6,boxShadow:m.role==="assistant"?"0 1px 6px rgba(0,0,0,0.07)":"none"}}>
+                    {m.text.split("\n").map((l,li)=><div key={li}>{l||<br/>}</div>)}
+                  </div>
+                </div>
+              ))}
+              {chatLoad&&<div style={{display:"flex",gap:8}}><div style={{width:28,height:28,borderRadius:"50%",background:"linear-gradient(135deg,#1A3A5C,#0F6E56)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>🏄</div><div style={{background:"#fff",borderRadius:"18px 18px 18px 4px",padding:"11px 16px",boxShadow:"0 1px 6px rgba(0,0,0,0.07)",display:"flex",gap:5,alignItems:"center"}}>{[0,1,2].map(n=><div key={n} style={{width:6,height:6,borderRadius:"50%",background:"#1A3A5C",opacity:0.4,animation:`bounce 1s ${n*0.2}s infinite`}}/>)}</div></div>}
+              <div ref={chatRef}/>
+            </div>
+            <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:10}}>
+              {["Como estão meus treinos?","Preciso periodizar agora?","Treinos pesados demais","Cãimbras continuam"].map(s=>(
+                <button key={s} onClick={()=>setChatIn(s)} style={{background:"#fff",border:"1px solid #E0E0E0",borderRadius:20,padding:"7px 14px",fontSize:12,cursor:"pointer",whiteSpace:"nowrap",color:"#1A3A5C",fontWeight:500,flexShrink:0}}>{s}</button>
+              ))}
+            </div>
+            <div style={{display:"flex",gap:10,background:"#fff",borderRadius:16,padding:"10px 14px",boxShadow:"0 -2px 12px rgba(0,0,0,0.06)"}}>
+              <input value={chatIn} onChange={e=>setChatIn(e.target.value)} onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&enviar()} placeholder="Pergunte ao seu personal..." style={{flex:1,border:"none",outline:"none",fontSize:14,background:"transparent",color:"#1C2B3A"}}/>
+              <button onClick={enviar} disabled={chatLoad||!chatIn.trim()} style={{background:chatIn.trim()?"linear-gradient(135deg,#1A3A5C,#0F6E56)":"#E0E0E0",border:"none",borderRadius:10,padding:"8px 16px",color:"#fff",fontSize:13,fontWeight:600,cursor:chatIn.trim()?"pointer":"default"}}>Enviar</button>
+            </div>
+          </div>
+        )}
+      </div>
+      <FeedbackModal/>
+    </div>
+  );
+}
+
+ReactDOM.render(<App/>, document.getElementById("root"));
+</script>
+</body>
+</html>
